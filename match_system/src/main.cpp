@@ -66,37 +66,55 @@ class Pool {
         }
 
         void match() {
-            while (users.size() > 1) {
+            for (uint32_t i = 0; i < wt.size(); i++)
+                wt[i]++;
+            if (users.size() > 1) {
                 bool flag = false;
-                sort(users.begin(), users.end(), [&](User a, User b){
-                        return a.score < b.score;});
-                for (uint32_t i = 1; i < users.size(); i++) {
-                    auto a = users[i], b = users[i - 1];
-                    if (a.score - b.score <= 50) {
-                        users.erase(users.begin() + i - 1, users.begin() + i + 1);
-                        save_result(a.id, b.id);
-                        flag = true;
-                        break;
+                for (uint32_t i = 0; i < users.size(); i++) {
+                    for (uint32_t j = i + 1; j < users.size(); j++) {
+                        if (check_match(i, j)) {
+                            save_result(users[i].id, users[j].id);
+
+                            users.erase(users.begin() + j);
+                            users.erase(users.begin() + i);
+
+                            wt.erase(wt.begin() + j);
+                            wt.erase(wt.begin() + i);
+
+                            flag = true;
+                            break;
+                        }
                     }
+                    if (flag) break;
                 }
-                if (!flag) break;
             }
         }
 
         void add(User user) {
             users.push_back(user);
+            wt.push_back(0);
         }
 
         void remove(User user) {
             for (uint32_t i = 0; i < users.size(); i++) {
                 if (users[i].id == user.id) {
                     users.erase(users.begin() + i);
+                    wt.erase(wt.begin() + i);
                     break;
                 }
             }
         }
     private:
         vector<User> users;
+        vector<int> wt;
+
+        bool check_match(uint32_t i, uint32_t j) {
+            auto a = users[i], b = users[j];
+            int dt = abs(a.score - b.score);
+            int a_max_dif = wt[i] * 50;
+            int b_max_dif = wt[j] * 50;
+            return dt <= a_max_dif && dt <= b_max_dif;
+        }
 } pool;
 
 class MatchHandler : virtual public MatchIf {
@@ -135,11 +153,11 @@ class MatchCloneFactory : virtual public MatchIfFactory {
         MatchIf* getHandler(const ::apache::thrift::TConnectionInfo& connInfo) override
         {
             std::shared_ptr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
-            cout << "Incoming connection\n";
+            /*cout << "Incoming connection\n";
             cout << "\tSocketInfo: "  << sock->getSocketInfo() << "\n";
             cout << "\tPeerHost: "    << sock->getPeerHost() << "\n";
             cout << "\tPeerAddress: " << sock->getPeerAddress() << "\n";
-            cout << "\tPeerPort: "    << sock->getPeerPort() << "\n";
+            cout << "\tPeerPort: "    << sock->getPeerPort() << "\n";*/
             return new MatchHandler;
         }
         void releaseHandler(MatchIf* handler) override {
@@ -185,4 +203,3 @@ int main(int argc, char **argv) {
     server.serve();
     return 0;
 }
-
